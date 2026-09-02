@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Test coverage report
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+*.sw?
+
+# Logs
+npm-debug.log*
+
+# Claude Code workspace (local, per-developer)
+.claude/
