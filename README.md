@@ -100,3 +100,8 @@ npm test
 npm run build       # clean → tsc → esbuild bin; the closure is asserted here
 node scripts/check-no-node-imports.mjs
 ```
+
+Every change reaches `main` through a pull request, squash-merged, with a
+[Conventional Commits](https://www.conventionalcommits.org/) title — and a
+change that moves the fixture suite's detection output is a breaking one even
+when the API is untouched. See [CONTRIBUTING.md](CONTRIBUTING.md).

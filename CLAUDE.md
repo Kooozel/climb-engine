@@ -130,8 +130,38 @@ event per decision point. `climb-cli --debug` writes it as NDJSON to stderr, and
 renders it in the integration test — both need their flag, since vitest's default reporter hides
 `console.log` from passing tests.
 
+## Workflow
+
+`CONTRIBUTING.md` is the long form; what matters when working here:
+
+- **`main` is the only long-lived branch** — there is no `develop`, because a release here is a tag
+  rather than a store submission to stage. Work on `<type>/<issue>-<slug>` off `main`
+  (`chore/1-transfer-engine`), rebase rather than merging `main` in: history on `main` is linear and
+  a merge commit cannot land.
+- **Every change goes through a pull request.** The ruleset on `main` requires one, requires both
+  checks green (`check`, `pr-title`), forbids force-push, deletion and non-linear history, and
+  allows only the squash merge. An admin bypass exists for emergencies; do not reach for it.
+- **Conventional Commits**, `<type>(<scope>)!: <subject>`, same shape as MapyClimbs.
+  Types: `feat` `fix` `perf` `refactor` `docs` `test` `build` `ci` `chore` `revert`. Scopes are a
+  closed set — `engine` `config` `types` `gradient` `scoring` `gpx` `geo` `cli` `ride` `test`
+  `build` `ci` `deps` `release` — and **a new area of the repo earns one by being added to `SCOPES`
+  in `scripts/check-pr-title.mjs`** — a separate list from the two closure lists above.
+- **The pull request title is the commit message on `main`.** Squashing takes the subject from the
+  title and the body from the description, so both land in `git log` verbatim; `scripts/check-pr-title.mjs`
+  validates the title in CI, and takes it as an argument locally. Branch commits are squashed and
+  are yours.
+- Close issues from the description (`Closes #12`), not from a commit trailer — the squashed body
+  is the description anyway, and the link then survives a retitle.
+
 ## Versioning
 
 Detection output is the contract, not just the type signatures. **Any change that moves the output
 of the fixture suite is a breaking bump**, even when the API is untouched — a retuned detector
 silently rewriting someone's training history is the exact failure this repo exists to prevent.
+
+A breaking change is marked `!` in the title (`refactor(engine)!: …`) and the movement is explained
+in the description. While the version is `0.x` that bump is the **minor** — `0.1.0` → `0.2.0`, which
+is what `^0.1.0` treats as incompatible; after `1.0.0`, ordinary semver. Releasing is an annotated
+`vX.Y.Z` tag on `main` plus the matching `package.json` version, by hand until
+[#3](https://github.com/Kooozel/climb-engine/issues/3) automates it and adds the fixture-hash guard
+that ties a moved output to a version bump.
