@@ -21,9 +21,15 @@ a plan:
 ## Versioning
 
 Detection output is the contract, not just the type signatures. **Any change
-that moves the output of the fixture suite is a major version bump**, even when
-the API is untouched — a retuned detector silently rewriting training history
-is the exact failure this repo exists to prevent.
+that moves the output of the fixture suite is a breaking bump**, even when the
+API is untouched — a retuned detector silently rewriting training history is the
+exact failure this repo exists to prevent.
+
+While the version is `0.x` that bump is the **minor** (`0.1.0` → `0.2.0`), which
+is what npm's `^0.1.0` treats as incompatible; after `1.0.0`, ordinary semver.
+That rule is mechanical, not a convention: `test/fixtures/output.sha256` is a
+digest of `detectClimbs` + `score()` output for every fixture, and CI fails a
+pull request whose digests move without the version moving with them.
 
 ## Install
 
@@ -33,14 +39,34 @@ Distribution is a git tag, not a registry:
 npm i github:Kooozel/climb-engine#v0.1.0
 ```
 
-`v0.1.0` is **not tagged yet** — the release automation and the fixture-hash
-version guard are [#3](https://github.com/Kooozel/climb-engine/issues/3), and
-cutting the tag plus migrating the three consumers is
+`v0.1.0` is **not tagged yet** — cutting it and migrating the three consumers is
 [#4](https://github.com/Kooozel/climb-engine/issues/4). Until then, install from
 a path or a branch.
 
 The package builds on install (`prepare`), so a consumer needs no build step of
 its own. It is ESM-only and ships no `main`: a CJS `require` is not supported.
+
+### Vendoring a single file
+
+A consumer that wants one file rather than a dependency — `~/sport` and krpaly
+both do, because a vendored build is what pins their stored climb rows to a
+known detector — takes it from the release assets instead:
+
+| Asset | What it is |
+| --- | --- |
+| `climb-engine.mjs` | the whole library, one dependency-free ESM file |
+| `climb-cli.mjs` | the executable, with its `#!/usr/bin/env node` banner |
+| `VERSION` | `source_commit`, `commit_date`, `built_with` — generated, not typed |
+
+```sh
+BASE=https://github.com/Kooozel/climb-engine/releases/download/v0.1.0
+curl -L "$BASE/climb-engine.mjs" -o vendor/climb-engine/climb-engine.mjs
+curl -L "$BASE/VERSION"          -o vendor/climb-engine/VERSION
+echo "vendored_on:   $(date -I)" >> vendor/climb-engine/VERSION
+```
+
+`vendored_on` is the one field the release cannot know: it is a fact about the
+copy, not about the build.
 
 ## Usage
 
@@ -97,8 +123,10 @@ npm ci
 npm run typecheck   # tsc --noEmit && tsc -p tsconfig.engine.json
 npm run lint
 npm test
-npm run build       # clean → tsc → esbuild bin; the closure is asserted here
+npm run build       # clean → tsc → esbuild bundles; the closure is asserted here
 node scripts/check-no-node-imports.mjs
+node scripts/check-fixture-hash.mjs   # detection output has not moved
+npm run fixtures:hash                 # …and this is how to record it when it has
 ```
 
 Every change reaches `main` through a pull request, squash-merged, with a

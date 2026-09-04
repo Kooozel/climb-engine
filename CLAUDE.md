@@ -14,6 +14,8 @@ npm run test:watch
 npm run build       # clean → tsc -p tsconfig.build.json → esbuild bin
 npm run format      # prettier --write src/ test/
 node scripts/check-no-node-imports.mjs   # after a build
+node scripts/check-fixture-hash.mjs      # after a build; BASE_REF=main adds the version rule
+npm run fixtures:hash                    # builds, then rewrites test/fixtures/output.sha256
 ```
 
 Run a single suite:
@@ -79,11 +81,16 @@ Two checks stand behind those rules, and **a file joining the engine must be add
   imports `node:` by design.
 - `scripts/build-cli.mjs` walks the module graph esbuild actually resolves from the three pure
   entry points (`src/index.ts`, `src/gpx.ts`, `src/geo.ts`) and fails on any input outside
-  `ENGINE_CLOSURE`.
+  `ENGINE_CLOSURE`. It then writes the two bundles a release attaches — `dist/climb-engine.mjs`
+  (the library, browser-resolved) and `dist/climb-cli.mjs` — but only once the closure holds, so a
+  failed check leaves no artifact behind.
 
 `scripts/check-no-node-imports.mjs` is the third, after a build: no emitted file under `dist/`
 except `climb-cli.mjs` may contain a `node:` specifier. It is what keeps `./ride` honest —
 `analyzeRide` takes GPX *content*, not a path, and nothing should quietly change that.
+
+`scripts/check-fixture-hash.mjs` is the fourth, and it guards the *output* rather than the closure —
+see Versioning below.
 
 Neither the closure check nor the engine tsconfig catches a *type-only* import of a foreign type,
 which esbuild erases and tsc accepts. That one is on review.
@@ -103,6 +110,10 @@ src/cli/analyze-ride.ts   the `./ride` subpath: ride GPX → the consumer's outp
 src/cli/ride-metrics.ts   moving time and HR-zone aggregation (VAM is on moving time)
 src/cli/index.ts          the only impure file: args, file reads, printing
 ```
+
+`scripts/` carries the checks: `build-cli.mjs` (closure + the two bundles),
+`check-no-node-imports.mjs`, `check-fixture-hash.mjs` (the output contract),
+`check-pr-title.mjs`, and `write-version.mjs` (release provenance).
 
 `cli/analyze-ride.ts` is an output contract: every `climbs[]` key maps 1:1 onto a column of the
 downstream `climbs` table, so keys are **snake_case** there and camelCase↔snake_case conversion
@@ -161,7 +172,28 @@ silently rewriting someone's training history is the exact failure this repo exi
 
 A breaking change is marked `!` in the title (`refactor(engine)!: …`) and the movement is explained
 in the description. While the version is `0.x` that bump is the **minor** — `0.1.0` → `0.2.0`, which
-is what `^0.1.0` treats as incompatible; after `1.0.0`, ordinary semver. Releasing is an annotated
-`vX.Y.Z` tag on `main` plus the matching `package.json` version, by hand until
-[#3](https://github.com/Kooozel/climb-engine/issues/3) automates it and adds the fixture-hash guard
-that ties a moved output to a version bump.
+is what `^0.1.0` treats as incompatible; after `1.0.0`, ordinary semver.
+
+That rule is mechanical. `test/fixtures/output.sha256` holds a SHA-256 per fixture over
+`detectClimbs` + `score()` output under all three models, and `scripts/check-fixture-hash.mjs` runs
+two layers: **freshness** (recomputed digests match the committed file) and **the version rule**
+(where the committed digests differ from `BASE_REF`'s, `package.json` must have moved in the
+breaking position, computed from the base version rather than hard-coded). Layer 1 alone passes the
+moment someone regenerates the file, so layer 2 is the half that holds the line. `expected.js`
+cannot do this job: its assertions carry tolerances, so a climb moving 100 m passes it green.
+
+Three things about it are worth knowing before touching it:
+
+- It reads `dist/`, lazily — which is why `fixtures:hash` builds first, and why
+  `test/fixture-hash.test.js` can import its helpers before any build has run.
+- Numbers are rounded to **nine significant digits** before hashing, so a reordered
+  floating-point sum in a pure refactor does not demand a minor bump. Changing that rounding
+  means bumping `FORMAT` in the script; layer 2 then reports the two files as incomparable
+  rather than as a retune nobody made.
+- Layer 2 skips itself, loudly, when `BASE_REF` is unset or unresolvable, when the base has no
+  `output.sha256`, or when the formats differ. A skip is printed, never silent.
+
+Releasing is an annotated `vX.Y.Z` tag on `main` plus the matching `package.json` version. Pushing
+the tag is the only manual step: `.github/workflows/release.yml` refuses a tag that disagrees with
+`package.json`, runs the whole gate, and attaches `climb-engine.mjs`, `climb-cli.mjs` and a
+generated `VERSION` (`scripts/write-version.mjs`) to the Release.

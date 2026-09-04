@@ -30,6 +30,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "fixtures:hash": "npm run build && node scripts/check-fixture-hash.mjs --write",
     "lint": "eslint src/ scripts/ eslint.config.js",
     "lint:fix": "eslint src/ scripts/ --fix",
     "format": "prettier --write src/ scripts/",
