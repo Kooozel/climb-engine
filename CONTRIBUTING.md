@@ -72,15 +72,18 @@ npm run lint
 npm test
 npm run build
 node scripts/check-no-node-imports.mjs
+BASE_REF=main node scripts/check-fixture-hash.mjs
 npm pack --dry-run
 ```
+
+`BASE_REF` is what CI sets, and without it the fixture check only asks whether
+the committed digests are fresh — not whether you were allowed to move them.
 
 ## Breaking changes
 
 **Detection output is the contract, not just the type signatures.** If a change
-moves the output of `test/gpx-integration.test.js`, it is breaking even when
-every signature is untouched — mark it `!` in the title and explain the
-movement in the body:
+moves the output of the fixture suite, it is breaking even when every signature
+is untouched — mark it `!` in the title and explain the movement in the body:
 
 ```
 refactor(engine)!: merge candidates before trimming, not after
@@ -89,6 +92,27 @@ refactor(engine)!: merge candidates before trimming, not after
 While the version is `0.x`, a breaking change bumps the **minor** (`0.1.0` →
 `0.2.0`), which is what npm's `^0.1.0` treats as incompatible; anything else
 bumps the patch. After `1.0.0`, ordinary semver.
+
+That rule is enforced, not trusted. `test/fixtures/output.sha256` holds a SHA-256
+per fixture over `detectClimbs` + `score()` output, and
+`scripts/check-fixture-hash.mjs` asks two questions on every pull request:
+
+1. **Is the committed file fresh?** If your change moved the output, the digests
+   no longer match and CI names the fixtures. Run `npm run fixtures:hash` and
+   commit the result.
+2. **Were you allowed to move it?** Where the committed digests differ from
+   `main`'s, `package.json` must have moved in the breaking position. Layer 1
+   alone passes the moment you regenerate the file, so this is the half that
+   actually holds the line.
+
+So a pull request that retunes the detector carries three things: the source
+change, a regenerated `output.sha256`, and a bumped minor. `expected.js` cannot
+do this job — its assertions carry tolerances to absorb GPS float noise, so a
+climb moving 100 m passes it green.
+
+The digest rounds to nine significant digits, which absorbs the last-bit drift a
+reordered floating-point sum causes. A pure refactor that changes no real number
+does not trip it; if yours does, it moved something.
 
 Two rules from `CLAUDE.md` bear repeating here because they are what review
 looks for:
@@ -102,7 +126,28 @@ looks for:
 
 A release is an annotated tag `vX.Y.Z` on `main` plus the matching
 `package.json` version — that tag is the whole distribution channel
-(`npm i github:Kooozel/climb-engine#v0.1.0`). Automating it, and adding the
-fixture-hash guard that ties a moved output to a version bump, is
-[#3](https://github.com/Kooozel/climb-engine/issues/3); until then it is done
-by hand, from `main`, after CI is green.
+(`npm i github:Kooozel/climb-engine#v0.1.0`).
+
+Pushing the tag is the only manual step. In a pull request:
+
+```sh
+npm version <patch|minor> --no-git-tag-version   # minor if the output moved
+npm run fixtures:hash                            # only if it did
+```
+
+Then, once that is merged and CI on `main` is green:
+
+```sh
+git checkout main && git pull
+git tag -a v0.2.0 -m "v0.2.0"
+git push origin v0.2.0
+```
+
+`release.yml` takes it from there: it refuses the tag if it disagrees with
+`package.json`, runs the whole gate again, and creates the Release with
+`climb-engine.mjs`, `climb-cli.mjs` and a generated `VERSION` attached. Those
+three assets are the point of distributing by tag — `~/sport` and krpaly vendor
+one file, not a clone.
+
+The version guard runs *before* anything is built, because a tag cannot be moved
+once a consumer has installed it.

@@ -1,10 +1,13 @@
 /**
- * build-cli.mjs — bundle the CLI, and assert the engine's closure.
+ * build-cli.mjs — bundle the engine and the CLI, and assert the engine's closure.
  *
- * Emits one dependency-free ESM file, dist/climb-cli.mjs, the executable that
- * `bin` points at. The library half of dist/ is unbundled and written by `tsc
- * -p tsconfig.build.json`, which has already run by the time this does — hence
- * no rm of the output directory here; `npm run clean` owns that.
+ * Emits two dependency-free ESM files: dist/climb-engine.mjs, the whole library
+ * in one file, and dist/climb-cli.mjs, the executable that `bin` points at.
+ * Those two plus a generated VERSION are the assets a release attaches, which
+ * is what makes vendoring a curl against an immutable URL rather than a clone.
+ * The rest of dist/ is the unbundled tree written by `tsc -p
+ * tsconfig.build.json`, which has already run by the time this does — hence no
+ * rm of the output directory here; `npm run clean` owns that.
  *
  * The engine's whole transitive closure is local — climb-types.ts, scoring.ts,
  * climb-engine.config.ts, max-gradient.ts, plus gpx.ts and geo.ts behind the
@@ -84,6 +87,21 @@ if (strays.length > 0) {
   process.exit(1);
 }
 
+// Both bundles are written only once the closure holds, so a build that fails
+// the check above leaves no artifact behind for a release to pick up.
+//
+// The library bundle is the root barrel resolved as a browser resolves it —
+// the same claim the metafile pass just checked, now written out. It is emitted
+// by every build rather than only at release time: the pass costs milliseconds,
+// and emitting it always is what puts it under check-no-node-imports.mjs and
+// inside `npm pack`.
+await build({
+  ...shared,
+  platform: "browser",
+  entryPoints: ["src/index.ts"],
+  outfile: `${OUT_DIR}/climb-engine.mjs`,
+});
+
 await build({
   ...shared,
   entryPoints: ["src/cli/index.ts"],
@@ -94,5 +112,7 @@ await build({
 // esbuild does not set the mode, and `bin` entries are executed directly.
 await chmod(`${OUT_DIR}/climb-cli.mjs`, 0o755);
 
-const { size } = await stat(`${OUT_DIR}/climb-cli.mjs`);
-console.log(`${OUT_DIR}/climb-cli.mjs  ${(size / 1024).toFixed(1)} KB`);
+for (const name of ["climb-engine.mjs", "climb-cli.mjs"]) {
+  const { size } = await stat(`${OUT_DIR}/${name}`);
+  console.log(`${OUT_DIR}/${name}  ${(size / 1024).toFixed(1)} KB`);
+}

@@ -1,0 +1,15 @@
+# SHA-256 over detectClimbs + score() output for every .gpx in this directory.
+# Regenerate with `npm run fixtures:hash`; never edit a line by hand.
+#
+# A line that moves is a breaking change even when no signature did — see
+# CONTRIBUTING.md "Breaking changes". scripts/check-fixture-hash.mjs enforces
+# that. `format` is the normalisation revision, not the package version.
+format: 1
+80c0d653e7b717fe2e1efeda180c02fde139d25e57e699ddbde033b373295eea  b7.gpx
+412ea78515ec8b022fbdb1d386aeaace339d0916b4d8f02690b7f5f4d36b230b  bk.gpx
+7c59df7f480ccac4c15b72e22cc593fe92b787defddc8dc41d134c661a190266  grun.gpx
+b18cf97d90383b9681a73a6987b1fbe42f986afba6fc29bccdb8175958ca5c75  hukvaldy.gpx
+041025c66844f18fb6517d0ad570936530fef88dea060be653613185173ef86f  lh.gpx
+06afc361f109b894bfbbffce5b1e82e4813e291a96d3e6746d63d9fe396e4a09  ond_mal.gpx
+f2c368089d6b29daeea616ce51a5803743c9c1479bd4c9b720061a3f976cbd02  ride-synthetic.gpx
+95cea21ae43dd9b2204eeb97552a216c8f246a6d1ed94c118255b46a40d5cb44  travny.gpx

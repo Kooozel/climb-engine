@@ -10,7 +10,15 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # Full history, and then the base branch by name: the fixture-output guard
+      # compares this branch's committed digests against the base's, and on a
+      # pull_request event the checkout is a merge ref with no origin/<base>.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - if: github.event_name == 'pull_request'
+        run: git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
 
       - uses: actions/setup-node@v4
         with:
@@ -29,6 +37,14 @@ jobs:
       # gate rather than a release-time discovery.
       - run: npm run build
       - run: node scripts/check-no-node-imports.mjs
+
+      # Detection output is the contract. Reads dist/, so it runs after the
+      # build; BASE_REF is what turns on the half that enforces the version
+      # rule, and it is empty on a push to main because the pull request
+      # already asked that question.
+      - env:
+          BASE_REF: ${{ github.event_name == 'pull_request' && 'FETCH_HEAD' || '' }}
+        run: node scripts/check-fixture-hash.mjs
 
       # test/fixtures/ is ~1.2 MB of real GPX and must not reach anyone's
       # node_modules; "files": ["dist"] is what keeps it out.
