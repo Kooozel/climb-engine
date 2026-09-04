@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `prepare` runs the build, so this step already exercises it once — the
+      # same way a consumer's `npm i github:Kooozel/climb-engine#tag` does.
+      - run: npm ci
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+      # A broken build here breaks `npm ci` in every consumer, so it is a PR
+      # gate rather than a release-time discovery.
+      - run: npm run build
+      - run: node scripts/check-no-node-imports.mjs
+
+      # test/fixtures/ is ~1.2 MB of real GPX and must not reach anyone's
+      # node_modules; "files": ["dist"] is what keeps it out.
+      - run: npm pack --dry-run

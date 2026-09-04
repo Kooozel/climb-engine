@@ -1,0 +1,32 @@
+{
+  // The engine's closure, compiled the way its consumers will (#68): no DOM lib,
+  // no ambient @types, so an accidental `document.` or `chrome.` in these files
+  // fails here rather than in someone's service worker.
+  //
+  // It does NOT catch an import reaching back out of the closure — that is the
+  // value-level half of the boundary, asserted in scripts/build-cli.mjs
+  // (ENGINE_CLOSURE) against the module graph esbuild actually walks. Adding a
+  // file to the engine means adding it to both lists, on purpose.
+  //
+  // src/cli/** is deliberately absent: it imports `node:` by design.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "files": [
+    "src/index.ts",
+    "src/climb-engine.ts",
+    "src/climb-engine.config.ts",
+    "src/climb-types.ts",
+    "src/geo.ts",
+    "src/gpx.ts",
+    "src/max-gradient.ts",
+    "src/scoring.ts"
+  ]
+}
